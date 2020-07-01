@@ -1,16 +1,45 @@
 # Redis Cluster in K8s
 
-Comparison runs
-
 ```
-kind create cluster --image kindest/node:v1.17.5 --config ./kind_multinode.yaml
+# 1.17.5 - no matches for kind "Deployment" in version "extensions/v1beta1"
+# 1.16.9 - no matches for kind "Deployment" in version "extensions/v1beta1"   - Deprecated 1.16
+kind create cluster --image kindest/node:v1.15.11 --config ./kind_multinode.yaml
 
-# Install the operator
-helm install --name operator ~/go/src/github.com/amadeusitgroup/redis-operator/chart/redis-operator
-
-
+# Install the operator (Helm3)
+helm install operator ~/go/src/github.com/amadeusitgroup/redis-operator/chart/redis-operator
 ```
 
+### Creates
+
+1 pod
+1 deployment: operator-redis-operator
+1 replicaset
+1 CRD: redisclusters.redisoperator.k8s.io
+
+
+# Install DB
+
+```
+helm install cluster ./redis-cluster
+```
+
+### Creates
+6 pods    : cluster pods: "Controlled By:  RedisCluster/cluster", prio:0
+1 service : port 6379
+1 configmap: redis.conf       : redis config
+
+
+### Pod inspect
+kubectl exec -it rediscluster-cluster-6gr2q -- sh
+kubectl exec -it rediscluster-cluster-6gr2q -- redis-cli cluster nodes
+
+redisnode --v=6 ....
+  -> starts redis-server /redis-conf/redis.conf
+
+
+
+
+# OLD
 
 ```
 # Start K8s if needed
