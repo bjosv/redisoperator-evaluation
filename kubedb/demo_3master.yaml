@@ -12,17 +12,17 @@ spec:
   cluster:
     master: 3
     replicas: 1
-  # storageType: Ephemeral
-  storageType: Durable
-  storage:
-    resources:
-      requests:
-        storage: 1Gi
-    storageClassName: "standard"
-    accessModes:
-      - ReadWriteOnce
-  # terminationPolicy: WipeOut
-  terminationPolicy: Pause
+  storageType: Ephemeral
+  # storageType: Durable
+  # storage:
+  #   resources:
+  #     requests:
+  #       storage: 1Gi
+  #   storageClassName: "standard"
+  #   accessModes:
+  #     - ReadWriteOnce
+  # terminationPolicy: Pause
+  terminationPolicy: WipeOut
   updateStrategy:
     type: RollingUpdate
 

@@ -20,7 +20,7 @@ kubectl get pods --all-namespaces
 
 log "Installing operator.."
 helm install kubedb-operator appscode/kubedb --set logLevel=${KUBEDB_LOGLEVEL} --version ${KUBEDB_VERSION} --namespace kube-system
-sleep 30
+sleep 60
 kubectl --namespace=kube-system get deployments -l "release=kubedb-operator, app=kubedb"
 
 log "Installing catalog.."

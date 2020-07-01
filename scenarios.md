@@ -11,15 +11,12 @@ cd kubedb
 kubectl create configmap rd-custom-config --from-file=redis.conf=./cluster-config.conf
 kubectl get configmap/rd-custom-config -o yaml
 
-# Install DB
+# Install DB (Redis 5.0.3)
 kubectl apply -f demo_3master.yaml
 
 # Fill with data (!! Update REDIS_HOST ENV)
 make -C ~/git/redis-job run
 kubectl get jobs
-
-kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES | grep master
-pod/rediscluster-cluster-28jcs
 
 kubectl exec redis-cluster-3master-shard0-0 -- redis-cli DBSIZE
 kubectl exec redis-cluster-3master-shard1-0 -- redis-cli DBSIZE
@@ -49,35 +46,57 @@ kubectl exec rediscluster-cluster-v6t2d -- redis-cli DBSIZE
 kubectl exec rediscluster-cluster-q7s9h -- redis-cli DBSIZE
 ```
 
-# Scenarios
+## Scenarios
 
-## Segfault master
+### Segfault master (3 master setup)
 
-### KubeDB
+#### KubeDB
 ```
 kubectl logs redis-cluster-3master-shard0-0
 kubectl logs redis-cluster-3master-shard0-1
-kubectl exec redis-cluster-3master-shard0-0 -- redis-cli cluster nodes | grep myself
-kubectl get pods --all-namespaces -o jsonpath='{range.items[*]}{.metadata.name} ---------- {.status.podIP}:6379{"\n"}' | grep redis
+kubectl get pods
 
 kubectl exec redis-cluster-3master-shard0-0 -- redis-cli cluster nodes | grep master
 kubectl exec redis-cluster-3master-shard0-0 -- redis-cli DEBUG SEGFAULT
-
-> - Pod restarts
-  - Slave sees master is lost, tries to connect to master which fails
-  - tries again: ok, replica ask for sync: Replica ID mismatch
-  - Resync
-
+kubectl get pods
 kubectl exec redis-cluster-3master-shard0-0 -- redis-cli cluster nodes | grep master
+kubectl describe statefulset redis-cluster-3master-shard0
+
+kubectl exec -it redis-cluster-3master-shard0-0 -- sh
+
+kubectl exec redis-cluster-3master-shard0-0 -- redis-cli DBSIZE
+kubectl exec redis-cluster-3master-shard1-0 -- redis-cli DBSIZE
+kubectl exec redis-cluster-3master-shard2-0 -- redis-cli DBSIZE
+
+>> Result:
+1. cluster-node-timeout 2000, mounted nodes.conf (Mounted as EmptyDir)
+  - Every second restart: Master pod restarts, understands it was master before
+  - Replica sees master is lost, tries to connect to master, connects second time
+  - Master sync empty DB to replica....
+
+2. cluster-node-timeout 1
+  - Pod restarts
+  - Replica takes over as master
+
+* statefulset-controller not affected
+* operator not affected
+* Since data is mounted as EmptyDir, its kept across container crashes.
+  This might be the reason for not failing over
+* Using /tmp as place to store nodes.conf makes sure it is re-created when container crash
+  But the IP for "self" is missing since the fix-ip.sh uses /data
+  It seems that an EmptyDir/Storage mount is required for nodes.conf
+* Restart a node and loosing nodes.conf might not work with Redis Cluster
+  -or-
+  its missing the ip?
 ```
 
-### Redis-Cluster
+#### Redis-Cluster
 ```
 kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES
 kubectl get pods -l app=redis-cluster -o wide
 
-MASTER=rediscluster-cluster-b7vxk
-REPLICA=rediscluster-cluster-t4pvd
+MASTER=rediscluster-cluster-qh2hs
+REPLICA=rediscluster-cluster-6lm92
 
 kubectl exec $MASTER -- redis-cli CLUSTER NODES | grep self
 kubectl exec $REPLICA -- redis-cli CLUSTER NODES | grep self
@@ -113,22 +132,80 @@ Operator: Sync with pods each 30s
           BUT still: Error when get cluster infos to rebuild bom : Cluster view is inconsistent
 ```
 
+### Pod delete - graceful deletion of Master (3 master setup)
+
+kubectl delete pods <pod>
+
+#### KubeDB
+```
+kubectl logs redis-cluster-3master-shard0-0
+kubectl logs redis-cluster-3master-shard0-1
+
+kubectl exec redis-cluster-3master-shard0-0 -- redis-cli cluster nodes | grep master
+kubectl exec redis-cluster-3master-shard0-1 -- redis-cli cluster nodes | grep master
+kubectl get pods
+time kubectl delete pod redis-cluster-3master-shard0-0
+kubectl get pods
+kubectl exec redis-cluster-3master-shard0-0 -- redis-cli cluster nodes | grep master
+kubectl exec redis-cluster-3master-shard0-1 -- redis-cli cluster nodes | grep master
+
+kubectl logs redis-cluster-3master-shard0-0
+kubectl logs redis-cluster-3master-shard0-1
+
+kubectl describe statefulset redis-cluster-3master-shard0
+
+kubectl logs -n kube-system kubedb-operator-74dc7d69c5-t6kt7
+
+>> Result:
+cluster-node-timeout 2000:
+     Command: command takes 2-11 sec
+ 1. Using EmptyDir mounted as /data => nodes.conf is lost
+    -> Pod get new IP
+    -> Missing IP for self
+    -> only myself in nodes.conf
+    -> replica tells: master, fail for old IP
+ 2. Using permanent storage for /data => nodes.conf is resilient
+    -> Pod get new IP
+    -> IP address for Redis instance differs between instances..
+       both nodes.conf and CLUSTER SLOTS..
+    -> Master still master, keys lost in old master
+
+cluster-node-timeout 1:
+ 1. Using EmptyDir mounted as /data => nodes.conf is lost
+    -> Pod get new IP
+    -> Missing IP for self
+    -> only myself in nodes.conf
+    Keys lost in old master
+ 2. Using permanent storage for /data => nodes.conf is resilient
+    -> Master:  the statefulset-controller restarts pod, become new replica
+    -> Replica: Connection with master lost. (1 to 3.5) sec later: become new master
+    -> Operator: nothing
+
+```
+11:36:39.734 # Connection with master lost.
+
+11:36:50.848 # oO0OoO0OoO0Oo Redis is starting 
+
+#### Redis-Cluster
+```
+```
+
+### Pod delete - force delete of Master (3 master setup)
+
+kubectl delete pods <pod> --grace-period=0 --force
+
+#### KubeDB
+```
+```
+
+#### Redis-Cluster
+```
+```
 
 
-#### Manual cluster failover
 
 
-# Triggers pod restart
-
-kubectl exec redis-cluster-3master-shard0-0 -- redis-cli cluster nodes | grep myself
-
-93ce690f54620d56737fa45bf57acff18acd900e 10.244.3.5:6379@16379 master - 0 1593428797197 2 connected 5461-10922
-bf742a3cc4cdc2850b55f49cf387e2b84fd27ac6 10.244.3.7:6379@16379 slave 1af64f33f7e74399ada01f1e831eee0bdb3488ac 0 1593428796000 3 connected
-d95d5c151d12d4b3702f3dc97f00033c84d4fd40 10.244.2.5:6379@16379 slave 93ce690f54620d56737fa45bf57acff18acd900e 0 1593428796595 2 connected
-8f3d50f6e23cedaa61c209955b6bb88c683f1730 10.244.2.3:6379@16379 myself,master - 0 1593428796000 1 connected 0-5460
-1af64f33f7e74399ada01f1e831eee0bdb3488ac 10.244.1.4:6379@16379 master - 0 1593428796194 3 connected 10923-16383
-d34c6f6fce58e58c7dfc605788bbe34bdc3141d1 10.244.3.3:6379@16379 slave 8f3d50f6e23cedaa61c209955b6bb88c683f1730 0 1593428797000 1 connected
-
+### Manual cluster failover
 
 
 
@@ -153,6 +230,9 @@ kubectl exec redis-cluster-3master-shard0-0 -- redis-cli config get \*
 
 ## Get log
 kubectl logs redis-cluster-3master-shard0-0
+
+# Get pods with IPs
+kubectl get pods --all-namespaces -o jsonpath='{range.items[*]}{.metadata.name} ---------- {.status.podIP}:6379{"\n"}' | grep redis
 
 # Get Redis cluster config
 kubectl describe configmap/redis-cluster-3master
