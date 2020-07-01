@@ -1,14 +1,18 @@
 apiVersion: kubedb.com/v1alpha1
 kind: Redis
 metadata:
-  name: redis-cluster-2
-  namespace: demo
+  name: redis-cluster-3master
 spec:
-  version: 5.0-v1
+  version: 5.0.3-v1
   mode: Cluster
+  # Added
+  configSource:
+    configMap:
+      name: rd-custom-config
   cluster:
     master: 3
     replicas: 1
+  # storageType: Ephemeral
   storageType: Durable
   storage:
     resources:
@@ -17,6 +21,7 @@ spec:
     storageClassName: "standard"
     accessModes:
       - ReadWriteOnce
+  # terminationPolicy: WipeOut
   terminationPolicy: Pause
   updateStrategy:
     type: RollingUpdate

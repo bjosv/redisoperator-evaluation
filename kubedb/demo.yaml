@@ -2,7 +2,6 @@ apiVersion: kubedb.com/v1alpha1
 kind: Redis
 metadata:
   name: redis-cluster
-  namespace: demo
 spec:
   version: 5.0-v1
   mode: Cluster

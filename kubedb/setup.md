@@ -9,24 +9,13 @@ kind create cluster --image kindest/node:v1.16.9 --config ./kind_multinode.yaml
 ### K8s 1.17.5
 kind create cluster --image kindest/node:v1.17.5 --config ./kind_multinode.yaml
 
-
-
-## Option 1: (Not working?) Install KubeDB via script
-curl -fsSL https://github.com/kubedb/installer/raw/v0.13.0-rc.0/deploy/kubedb.sh | bash
-!!! TIMEOUT !!! but ok when checking status
-
-### Check status
-kubectl get crd -l app=kubedb
-kubectl get pods --all-namespaces -l app=kubedb --watch
-
 ## Option 2: Install KubeDB via helm
 (Using Helm v3.2.3)
 
+### Prepare
 helm repo add appscode https://charts.appscode.com/stable/
 helm repo update
 helm search repo appscode/kubedb
-
-helm install appscode/kubedb-catalog --version 
 
 ### Install operator and CRDs (Latest stable: v0.12)
 helm install kubedb-operator appscode/kubedb --version v0.13.0-rc.0 --namespace kube-system
@@ -40,6 +29,14 @@ helm install kubedb-catalog appscode/kubedb-catalog --version v0.13.0-rc.0 --nam
 kubectl get crds -l app=catalog
 kubectl get redisversion
 
+## Option 2: (Not working?) Install KubeDB via script
+curl -fsSL https://github.com/kubedb/installer/raw/v0.13.0-rc.0/deploy/kubedb.sh | bash
+!!! TIMEOUT !!! but ok when checking status
+### Check status
+kubectl get crd -l app=kubedb
+kubectl get pods --all-namespaces -l app=kubedb --watch
+
+
 ## Install CLI (93MB)
 KubeDB provides a CLI to work with database objects.
 
@@ -49,31 +46,37 @@ wget -O kubedb https://github.com/kubedb/cli/releases/download/0.12.0/kubedb-lin
 
 ## Install DB
 
-kubectl create ns demo
+```
 kubedb create -f demo.yaml
 or
 kubedb create -f demo2.yaml
+```
+
+#### Creates
+6 pods         :  "Controlled By: StatefulSet/redis-cluster-2-shard0"
+                  Ports:         6379/TCP, 16379/TCP
+2 services     : redis-cluster-2 - port: 6379
+                 kubedb          - no port, no ip, Type: ClusterIP
+3 statefulsets : 2 replicas each
+                 service account, volume claim, rolling update
+1 AppBinding
+1 Redis
+
+
 
 ### Check DB
-kubedb describe rd -n demo redis-cluster
-demo                 redis-cluster-shard0-0                       1/1     Running   0          2m24s
-demo                 redis-cluster-shard0-1                       1/1     Running   0          2m14s
-demo                 redis-cluster-shard1-0                       1/1     Running   0          2m5s
-demo                 redis-cluster-shard1-1                       1/1     Running   0          2m2s
-demo                 redis-cluster-shard2-0                       1/1     Running   0          119s
-demo                 redis-cluster-shard2-1                       1/1     Running   0          108s
+kubedb describe rd redis-cluster
 
-
-kubectl get statefulset -n demo
+kubectl get statefulset
 NAME                   READY   AGE
 redis-cluster-shard0   2/2     23m
 redis-cluster-shard1   2/2     22m
 redis-cluster-shard2   2/2     22m
 
-kubectl get pvc -n demo
-kubectl get pv -n demo
+kubectl get pvc
+kubectl get pv
 
-kubectl get service -n demo
+kubectl get service
 NAME            TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
 kubedb          ClusterIP   None             <none>        <none>     24m
 redis-cluster   ClusterIP   10.110.141.171   <none>        6379/TCP   24m
