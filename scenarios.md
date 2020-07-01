@@ -41,9 +41,9 @@ kubectl get jobs
 kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES | grep master
 kubectl get pods -l app=redis-cluster -o wide
 
-kubectl exec rediscluster-cluster-b65x5 -- redis-cli DBSIZE
-kubectl exec rediscluster-cluster-v6t2d -- redis-cli DBSIZE
-kubectl exec rediscluster-cluster-q7s9h -- redis-cli DBSIZE
+kubectl exec rediscluster-cluster-p6zml -- redis-cli DBSIZE
+kubectl exec rediscluster-cluster-rqlxq -- redis-cli DBSIZE
+kubectl exec rediscluster-cluster-f9gj4 -- redis-cli DBSIZE
 ```
 
 ## Scenarios
@@ -182,12 +182,35 @@ cluster-node-timeout 1:
     -> Operator: nothing
 
 ```
-11:36:39.734 # Connection with master lost.
-
-11:36:50.848 # oO0OoO0OoO0Oo Redis is starting 
 
 #### Redis-Cluster
 ```
+kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES
+kubectl get pods -l app=redis-cluster -o wide
+
+MASTER=rediscluster-cluster-p6zml
+REPLICA=rediscluster-cluster-fphfh
+
+kubectl exec $MASTER -- redis-cli CLUSTER NODES | grep self
+kubectl exec $REPLICA -- redis-cli CLUSTER NODES | grep self
+
+kubectl logs $MASTER
+kubectl logs $REPLICA
+
+kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES | grep master
+kubectl get pods
+time kubectl delete pod $MASTER
+kubectl get pods
+kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES | grep master
+
+kubectl logs operator-redis-operator-c4497b-6dwl7
+
+>> Result:
+- Delete command takes ~3 sec
+- Replica: Manual failover requested before lost connection with master
+- No keys lost
+- After 20s new pod is up and synced as replica node
+
 ```
 
 ### Pod delete - force delete of Master (3 master setup)
