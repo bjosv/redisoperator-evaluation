@@ -223,6 +223,32 @@ kubectl delete pods <pod> --grace-period=0 --force
 
 #### Redis-Cluster
 ```
+kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES
+kubectl get pods -l app=redis-cluster -o wide
+
+MASTER=rediscluster-cluster-sgp4l
+REPLICA=rediscluster-cluster-g8wh7
+
+kubectl exec $MASTER -- redis-cli CLUSTER NODES | grep self
+kubectl exec $REPLICA -- redis-cli CLUSTER NODES | grep self
+
+kubectl logs $MASTER
+kubectl logs $REPLICA
+
+kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES | grep master
+kubectl get pods
+time kubectl delete pod $MASTER --grace-period=0 --force
+kubectl get pods
+kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES | grep master
+kubectl logs $REPLICA
+
+kubectl logs operator-redis-operator-c4497b-6dwl7
+
+>> Result:
+- Delete command takes ~0.6 sec
+- # Manual failover user request accepted.
+- Connection with master lost.
+- Replica become master before losing connection to master
 ```
 
 
