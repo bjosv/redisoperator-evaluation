@@ -5,6 +5,10 @@
 cd kubedb
 
 # Setup K8s and KubeDB operator + catalog
+# Alt: ./setup_latest.sh
+# ./setup_helm2.sh
+# KIND_VERSION=v1.16.9
+# KUBEDB_VERSION=v0.13.0-rc.0
 ./setup.sh
 
 # Create Redis config
@@ -29,11 +33,11 @@ cd redis-cluster
 
 kind create cluster --image kindest/node:v1.15.11 --config ./kind_multinode.yaml
 
-# Install operator
+# Install operator and DB
 helm install operator ~/go/src/github.com/amadeusitgroup/redis-operator/chart/redis-operator
-
-# Install DB
 helm install cluster ./redis-cluster
+
+# Helm2: install tiller and RBAC, see ../kubedb/setup_helm2.sh
 
 # Fill with data (!! Update REDIS_HOST ENV)
 make -C ~/git/redis-job run
@@ -219,6 +223,37 @@ kubectl delete pods <pod> --grace-period=0 --force
 
 #### KubeDB
 ```
+kubectl logs redis-cluster-3master-shard0-0
+kubectl logs redis-cluster-3master-shard0-1
+
+kubectl exec redis-cluster-3master-shard0-0 -- redis-cli cluster nodes | grep master
+kubectl exec redis-cluster-3master-shard0-1 -- redis-cli cluster nodes | grep master
+kubectl get pods
+time kubectl delete pod redis-cluster-3master-shard0-0 --grace-period=0 --force
+kubectl get pods
+kubectl exec redis-cluster-3master-shard0-0 -- redis-cli cluster nodes | grep master
+kubectl exec redis-cluster-3master-shard0-1 -- redis-cli cluster nodes | grep master
+
+kubectl logs redis-cluster-3master-shard0-0
+kubectl logs redis-cluster-3master-shard0-1
+
+kubectl describe statefulset redis-cluster-3master-shard0
+
+kubectl logs -n kube-system kubedb-operator-74dc7d69c5-t6kt7
+
+>> Result:
+1. cluster-node-timeout 1, durable storage
+- Slots lost
+- CLUSTER SLOTS: IPs not same in master and replica, new pod gets new IP, but
+  Restared pod gets new IP, but CLUSTER SLOTS got old IP
+
+2. cluster-node-timeout 1, temporary storage
+
+3. cluster-node-timeout 2000, durable storage
+
+4. cluster-node-timeout 2000, temporary storage
+
+
 ```
 
 #### Redis-Cluster
