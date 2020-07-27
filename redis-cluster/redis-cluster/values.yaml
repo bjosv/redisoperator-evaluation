@@ -11,7 +11,7 @@ annotations:
   # kubernetes.io/tls-acme: "true"
 image:
   repository: bjosv/redisnode
-  tag: 5.0.4
+  tag: 5.0.1
 #  tag: 6.0RC1
   pullPolicy: IfNotPresent
 log:
