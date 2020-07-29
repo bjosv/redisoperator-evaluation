@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: redis-job
+        image: bjosv/redis-job:latest
+        env:
+        - name: REDIS_HOSTS
+          value: "cluster-redis-cluster:6379"
+      restartPolicy: Never
+  backoffLimit: 4
