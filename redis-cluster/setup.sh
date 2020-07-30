@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-
 set -eou pipefail
 
-#K8S_VERSION=v1.16.9
+ROOT="$(git rev-parse --show-toplevel)"
+
 K8S_VERSION=v1.15.11
 
 RED='\033[0;31m'
@@ -14,7 +14,7 @@ function log {
 }
 
 log "Starting cluster.."
-kind create cluster --wait 2m --image kindest/node:${K8S_VERSION} --config ./kind_multinode.yaml
+kind create cluster --wait 2m --image kindest/node:${K8S_VERSION} --config $ROOT/redis-cluster/kind_multinode.yaml
 kubectl get pods --all-namespaces
 
 log "Waiting to make sure cluster is up.."
@@ -22,12 +22,11 @@ sleep 30
 kubectl get pods --all-namespaces
 
 log "Install operator..."
-helm install operator ~/go/src/github.com/amadeusitgroup/redis-operator/chart/redis-operator
-sleep 10
+helm install operator $ROOT/charts/redis-operator
+sleep 30
 kubectl get pods --all-namespaces
 
 log "Install DB..."
-helm install cluster ./redis-cluster
-
+helm install cluster $ROOT/charts/redis-cluster
 kubectl get pods --all-namespaces
 log "Pods starting up..."
