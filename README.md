@@ -10,11 +10,10 @@ Behaviours in following scenarios have been investigated:
 
 * [Inspection](scenarios/inspect.md)
 * [Reconfigure Redis and operator](scenarios/reconfig.md)
-* Segfault master (3 master setup)
-* Pod delete - graceful deletion of Master (3 master setup)
-* Pod delete - force delete of Master (3 master setup)
-* Manual cluster failover
-
+* [Segfault master (3 master setup)](scenarios.md)
+* [Pod delete - graceful deletion of Master (3 master setup)](scenarios.md)
+* [Pod delete - force delete of Master (3 master setup)](scenarios.md)
+* [Manual cluster failover](scenarios.md)
 * [Chaos testing](scenarios/chaos.md)
 
-* Crash pid 1 in master pod (3 master setup)
+* [Crash pid 1 in master pod (3 master setup)](scenarios.md)

@@ -7,19 +7,22 @@ cd kubedb
 # Setup K8s and KubeDB operator + catalog
 # Alt: ./setup_latest.sh
 # ./setup_helm2.sh
-# KIND_VERSION=v1.16.9
-# KUBEDB_VERSION=v0.13.0-rc.0
+# K8S_VERSION=v1.16.9
+# KUBEDB_VERSION=v0.13.0-rc.0        Aug 25, 2019
 ./setup.sh
 
 # Create Redis config
 kubectl create configmap rd-custom-config --from-file=redis.conf=./cluster-config.conf
 kubectl get configmap/rd-custom-config -o yaml
 
-# Install DB (Redis 5.0.3)
+# Install DB
+# Redis 5.0.3:
 kubectl apply -f demo_3master.yaml
+# Redis 6.0.6:
+kubectl apply -f demo_3master_redis6.0.6.yaml
 
 # Fill with data (!! Update REDIS_HOST ENV)
-make -C ~/git/redis-job run
+make -C ./tools/redis-job kubedb
 kubectl get jobs
 
 kubectl exec redis-cluster-3master-shard0-0 -- redis-cli DBSIZE
@@ -30,17 +33,20 @@ kubectl exec redis-cluster-3master-shard2-0 -- redis-cli DBSIZE
 ### Redis-Cluster
 ```
 cd redis-cluster
-
 kind create cluster --image kindest/node:v1.15.11 --config ./kind_multinode.yaml
 
-# Install operator and DB
+# Install operator
 helm install operator ~/go/src/github.com/amadeusitgroup/redis-operator/chart/redis-operator
+
+# Install DB
 helm install cluster ./redis-cluster
 
 # Helm2: install tiller and RBAC, see ../kubedb/setup_helm2.sh
+# helm2 install --name operator ~/go/src/github.com/amadeusitgroup/redis-operator/chart/redis-operator
+# helm2 install --name cluster ./redis-cluster
 
 # Fill with data (!! Update REDIS_HOST ENV)
-make -C ~/git/redis-job run
+make -C ./tools/redis-job run
 kubectl get jobs
 kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES | grep master
 kubectl get pods -l app=redis-cluster -o wide
@@ -48,6 +54,9 @@ kubectl get pods -l app=redis-cluster -o wide
 kubectl exec rediscluster-cluster-p6zml -- redis-cli DBSIZE
 kubectl exec rediscluster-cluster-rqlxq -- redis-cli DBSIZE
 kubectl exec rediscluster-cluster-f9gj4 -- redis-cli DBSIZE
+
+# Edit master, set to 4
+kubectl edit rediscluster cluster
 ```
 
 ## Scenarios
@@ -102,6 +111,7 @@ kubectl get pods -l app=redis-cluster -o wide
 MASTER=rediscluster-cluster-qh2hs
 REPLICA=rediscluster-cluster-6lm92
 
+kubectl exec $MASTER -- redis-cli DBSIZE
 kubectl exec $MASTER -- redis-cli CLUSTER NODES | grep self
 kubectl exec $REPLICA -- redis-cli CLUSTER NODES | grep self
 
@@ -192,8 +202,8 @@ cluster-node-timeout 1:
 kubectl exec service/cluster-redis-cluster -- redis-cli CLUSTER NODES
 kubectl get pods -l app=redis-cluster -o wide
 
-MASTER=rediscluster-cluster-p6zml
-REPLICA=rediscluster-cluster-fphfh
+MASTER=rediscluster-cluster-c2rfq
+REPLICA=rediscluster-cluster-rq2gd
 
 kubectl exec $MASTER -- redis-cli CLUSTER NODES | grep self
 kubectl exec $REPLICA -- redis-cli CLUSTER NODES | grep self
@@ -343,3 +353,33 @@ chmod 755 ~/bin/redis-cli
 
 # Get all versions available
 $ kubectl get redisversions -n kube-system  -o=custom-columns=NAME:.metadata.name,VERSION:.spec.version,DB_IMAGE:.spec.db.image,TOOLS_IMAGE:.spec.tools.image,EXPORTER_IMAGE:.spec.exporter.image,DEPRECATED:.spec.deprecated
+
+
+### Crash PID 1 in master pod (3 master setup)
+
+#### KubeDB
+```
+```
+
+#### Redis-Cluster
+```
+# Setup
+./setup.sh
+make -C ./tools/redis-job run
+
+# Make sure restart is 0 fr all
+kubectl get pods
+
+# Kill process from within a k8s worker
+kc nodes
+docker exec -it kind-worker3 lsns
+# Use pid of first /redisnode
+docker exec -it kind-worker3 kill -9 -1 <PID>
+
+
+
+# Alternative?? Probably to nice
+kubectl exec -it rediscluster-cluster-8ldbt -- /sbin/reboot
+
+
+```
