@@ -299,13 +299,12 @@ kubectl logs operator-redis-operator-c4497b-6dwl7
 
 
 
-### Manual cluster failover
+### Commands
 
 
 
 # Redis-Operator commands
 kubectl get pods -l app=redis-cluster -o wide
-
 
 
 # KubeDB commands
@@ -344,7 +343,6 @@ kubectl port-forward -n weave "$(kubectl get -n weave pod --selector=weave-scope
 xdg-open http://localhost:4040
 ```
 
-
 # Install redis-cli
 wget -c http://download.redis.io/redis-stable.tar.gz -O - | tar -xz -C /tmp
 make -C /tmp/redis-stable
@@ -353,33 +351,3 @@ chmod 755 ~/bin/redis-cli
 
 # Get all versions available
 $ kubectl get redisversions -n kube-system  -o=custom-columns=NAME:.metadata.name,VERSION:.spec.version,DB_IMAGE:.spec.db.image,TOOLS_IMAGE:.spec.tools.image,EXPORTER_IMAGE:.spec.exporter.image,DEPRECATED:.spec.deprecated
-
-
-### Crash PID 1 in master pod (3 master setup)
-
-#### KubeDB
-```
-```
-
-#### Redis-Cluster
-```
-# Setup
-./setup.sh
-make -C ./tools/redis-job run
-
-# Make sure restart is 0 fr all
-kubectl get pods
-
-# Kill process from within a k8s worker
-kc nodes
-docker exec -it kind-worker3 lsns
-# Use pid of first /redisnode
-docker exec -it kind-worker3 kill -9 -1 <PID>
-
-
-
-# Alternative?? Probably to nice
-kubectl exec -it rediscluster-cluster-8ldbt -- /sbin/reboot
-
-
-```
